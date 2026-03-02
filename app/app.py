@@ -15,14 +15,8 @@ HOW TO DEPLOY TO STREAMLIT CLOUD:
     4. Set the main file path to: app/app.py
     5. Deploy!
 
-WHAT YOU NEED TO CUSTOMIZE:
-    1. Update the page title and description
-    2. Update feature input fields to match YOUR features
-    3. Update the model paths if you changed them
-    4. Customize the styling if desired
-
-Author: [Your Name]  # <-- UPDATE THIS!
-Dataset: [Your Dataset]  # <-- UPDATE THIS!
+Author: Brodie Ellis
+Dataset: NYC 2019 Airbnb prices
 """
 
 import streamlit as st
@@ -34,10 +28,9 @@ from pathlib import Path
 # =============================================================================
 # PAGE CONFIGURATION
 # =============================================================================
-# This must be the first Streamlit command!
 st.set_page_config(
-    page_title="ML Prediction App",  # TODO: Update with your project name
-    page_icon="🤖",
+    page_title="NYC Airbnb Price Predictor",
+    page_icon="🏠",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -46,31 +39,26 @@ st.set_page_config(
 # HELPER FUNCTIONS
 # =============================================================================
 
-@st.cache_resource  # Cache the models so they don't reload every time
+@st.cache_resource
 def load_models():
     """Load all saved models and artifacts."""
-    # Get the path to the models directory
-    # This works both locally and on Streamlit Cloud
     base_path = Path(__file__).parent.parent / "models"
 
     models = {}
 
     try:
-        # Load regression model and scaler
         models['regression_model'] = joblib.load(base_path / "regression_model.pkl")
         models['regression_scaler'] = joblib.load(base_path / "regression_scaler.pkl")
         models['regression_features'] = joblib.load(base_path / "regression_features.pkl")
 
-        # Load classification model and artifacts
         models['classification_model'] = joblib.load(base_path / "classification_model.pkl")
         models['classification_scaler'] = joblib.load(base_path / "classification_scaler.pkl")
         models['label_encoder'] = joblib.load(base_path / "label_encoder.pkl")
         models['classification_features'] = joblib.load(base_path / "classification_features.pkl")
 
-        # Optional: Load binning info for display
         try:
             models['binning_info'] = joblib.load(base_path / "binning_info.pkl")
-        except:
+        except Exception:
             models['binning_info'] = None
 
     except FileNotFoundError as e:
@@ -81,22 +69,87 @@ def load_models():
     return models
 
 
+def get_user_inputs(key_prefix=""):
+    """Create user-friendly input widgets and return the feature dict expected by the models."""
+    col1, col2 = st.columns(2)
+
+    with col1:
+        room_type = st.selectbox(
+            "Room Type",
+            ["Entire home/apt", "Private room", "Shared room"],
+            key=f"{key_prefix}room_type",
+            help="The type of listing"
+        )
+        neighbourhood = st.selectbox(
+            "Borough",
+            ["Manhattan", "Brooklyn", "Queens", "Bronx", "Staten Island"],
+            key=f"{key_prefix}neighbourhood",
+            help="Which NYC borough is the listing in?"
+        )
+        reviews_per_month = st.number_input(
+            "Reviews per Month",
+            min_value=0.0,
+            max_value=60.0,
+            value=1.0,
+            step=0.1,
+            key=f"{key_prefix}reviews",
+            help="Average number of reviews the listing receives per month"
+        )
+
+    with col2:
+        availability_ratio = st.slider(
+            "Availability Ratio",
+            min_value=0.0,
+            max_value=1.0,
+            value=0.5,
+            step=0.01,
+            key=f"{key_prefix}availability",
+            help="Proportion of the year the listing is available (0 = never, 1 = always)"
+        )
+        host_listings = st.number_input(
+            "Host's Total Listings",
+            min_value=1,
+            max_value=300,
+            value=1,
+            step=1,
+            key=f"{key_prefix}host_listings",
+            help="How many total listings the host has on Airbnb"
+        )
+        minimum_nights = st.number_input(
+            "Minimum Nights",
+            min_value=1,
+            max_value=365,
+            value=2,
+            step=1,
+            key=f"{key_prefix}min_nights",
+            help="Minimum number of nights required for a booking"
+        )
+
+    # Convert user-friendly inputs into the one-hot encoded features the model expects
+    input_values = {
+        'room_type_Private room': room_type == "Private room",
+        'neighbourhood_group_Manhattan': neighbourhood == "Manhattan",
+        'reviews_per_month': reviews_per_month,
+        'availability_ratio': availability_ratio,
+        'room_type_Shared room': room_type == "Shared room",
+        'calculated_host_listings_count': host_listings,
+        'minimum_nights': minimum_nights,
+    }
+
+    return input_values
+
+
 def make_regression_prediction(models, input_data):
     """Make a regression prediction."""
-    # Scale the input
     input_scaled = models['regression_scaler'].transform(input_data)
-    # Predict
     prediction = models['regression_model'].predict(input_scaled)
     return prediction[0]
 
 
 def make_classification_prediction(models, input_data):
     """Make a classification prediction."""
-    # Scale the input
     input_scaled = models['classification_scaler'].transform(input_data)
-    # Predict
     prediction = models['classification_model'].predict(input_scaled)
-    # Get label
     label = models['label_encoder'].inverse_transform(prediction)
     return label[0], prediction[0]
 
@@ -106,209 +159,169 @@ def make_classification_prediction(models, input_data):
 # =============================================================================
 st.sidebar.title("Navigation")
 page = st.sidebar.radio(
-    "Choose a model:",
-    ["🏠 Home", "📈 Regression Model", "🏷️ Classification Model"]
+    "Choose a page:",
+    ["🏠 Home", "📈 Price Prediction", "🏷️ Price Category"]
 )
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### About")
 st.sidebar.info(
     """
-    This app deploys machine learning models trained on [YOUR DATASET].
+    This app uses machine learning models trained on the
+    **NYC Airbnb 2019** dataset (46,000+ listings).
 
-    - **Regression**: Predicts [YOUR TARGET]
-    - **Classification**: Predicts [YOUR CATEGORIES]
+    - **Regression**: Predicts nightly price ($)
+    - **Classification**: Predicts price category (Low / Medium / High)
     """
 )
-# TODO: UPDATE YOUR NAME HERE! This shows visitors who built this app.
-st.sidebar.markdown("**Built by:** [YOUR NAME]")
-st.sidebar.markdown("[GitHub Repo](https://github.com/YOUR-USERNAME/YOUR-REPO)")
+st.sidebar.markdown("**Built by:** Brodie Ellis")
+st.sidebar.markdown("Full Stack Academy AI & ML Bootcamp")
 
 
 # =============================================================================
 # HOME PAGE
 # =============================================================================
 if page == "🏠 Home":
-    st.title("🤖 Machine Learning Prediction App")
+    st.title("🏠 NYC Airbnb Price Predictor")
     st.markdown("### Welcome!")
 
     st.write(
         """
-        This application allows you to make predictions using trained machine learning models.
+        This application predicts Airbnb listing prices in New York City
+        using machine learning models trained on the 2019 NYC Airbnb dataset.
 
         **What you can do:**
-        - 📈 **Regression Model**: Predict a numerical value
-        - 🏷️ **Classification Model**: Predict a category
+        - 📈 **Price Prediction**: Enter listing details and get a predicted nightly price
+        - 🏷️ **Price Category**: Find out if a listing would be Low, Medium, or High priced
 
-        Use the sidebar to navigate between different models.
+        Use the sidebar to navigate between pages.
         """
     )
 
-    # TODO: Add more information about your specific project
     st.markdown("---")
     st.markdown("### About This Project")
     st.write(
         """
-        **Dataset:** [Describe your dataset]
+        **Dataset:** NYC Airbnb Open Data (2019) — 46,000+ listings across all five boroughs
 
-        **Problem Statement:** [What are you predicting and why?]
+        **Problem Statement:** Can we predict the nightly price of an Airbnb listing
+        based on its characteristics like room type, location, availability, and host activity?
 
         **Models Used:**
-        - Regression: [Your regression model type]
-        - Classification: [Your classification model type]
+        - **Regression:** Gradient Boosting Regressor (R² = 0.45, RMSE = $66)
+        - **Classification:** Gradient Boosting Classifier (Accuracy = 65%, F1 = 0.64)
+
+        **Features Used:**
+        Room type, borough, reviews per month, availability ratio,
+        host listing count, and minimum nights.
         """
     )
-
-    # Show a sample of your data or an image (optional)
-    # st.image("path/to/image.png", caption="Sample visualization")
 
 
 # =============================================================================
 # REGRESSION PAGE
 # =============================================================================
-elif page == "📈 Regression Model":
-    st.title("📈 Regression Prediction")
-    st.write("Enter feature values to get a numerical prediction.")
+elif page == "📈 Price Prediction":
+    st.title("📈 Predict Nightly Price")
+    st.write("Enter listing details below to get a predicted nightly price.")
 
-    # Load models
     models = load_models()
-
     if models is None:
         st.stop()
 
-    # Get feature names
-    features = models['regression_features']
-
     st.markdown("---")
-    st.markdown("### Enter Feature Values")
+    st.markdown("### Listing Details")
 
-    # Create input fields for each feature
-    # TODO: CUSTOMIZE THIS SECTION FOR YOUR FEATURES!
-    # The example below creates number inputs, but you may need:
-    # - st.selectbox() for categorical features
-    # - st.slider() for bounded numerical features
-    # - Different default values and ranges
-
-    # Create columns for better layout
-    col1, col2 = st.columns(2)
-
-    input_values = {}
-
-    for i, feature in enumerate(features):
-        # Alternate between columns
-        with col1 if i % 2 == 0 else col2:
-            # TODO: Customize each input based on your feature type and range
-            # Example: For a feature like 'bedrooms' you might use:
-            # input_values[feature] = st.number_input(feature, min_value=0, max_value=10, value=3)
-
-            input_values[feature] = st.number_input(
-                label=feature,
-                value=0.0,  # Default value - UPDATE THIS
-                help=f"Enter value for {feature}"
-            )
+    input_values = get_user_inputs(key_prefix="reg_")
 
     st.markdown("---")
 
-    # Prediction button
-    if st.button("🔮 Make Regression Prediction", type="primary"):
-        # Create input dataframe
+    if st.button("🔮 Predict Price", type="primary"):
         input_df = pd.DataFrame([input_values])
-
-        # Make prediction
         prediction = make_regression_prediction(models, input_df)
 
-        # Display result
-        st.success(f"### Predicted Value: {prediction:,.2f}")
+        # Clamp to reasonable range
+        prediction = max(prediction, 10)
 
-        # TODO: Add context to your prediction
-        # st.write(f"This means... [interpretation]")
+        st.success(f"### Predicted Nightly Price: ${prediction:,.0f}")
+        st.caption("Based on the NYC Airbnb 2019 dataset. Average listing price was $132/night.")
 
-        # Show input summary
         with st.expander("View Input Summary"):
-            st.dataframe(input_df)
+            display_df = pd.DataFrame([{
+                'Room Type': [k for k, v in {
+                    'Entire home/apt': not input_values['room_type_Private room'] and not input_values['room_type_Shared room'],
+                    'Private room': input_values['room_type_Private room'],
+                    'Shared room': input_values['room_type_Shared room']
+                }.items() if v][0],
+                'Borough': 'Manhattan' if input_values['neighbourhood_group_Manhattan'] else 'Other',
+                'Reviews/Month': input_values['reviews_per_month'],
+                'Availability': f"{input_values['availability_ratio']:.0%}",
+                'Host Listings': input_values['calculated_host_listings_count'],
+                'Min Nights': input_values['minimum_nights'],
+            }])
+            st.dataframe(display_df, hide_index=True)
 
 
 # =============================================================================
 # CLASSIFICATION PAGE
 # =============================================================================
-elif page == "🏷️ Classification Model":
-    st.title("🏷️ Classification Prediction")
-    st.write("Enter feature values to get a category prediction.")
+elif page == "🏷️ Price Category":
+    st.title("🏷️ Predict Price Category")
+    st.write("Enter listing details to find out the predicted price range.")
 
-    # Load models
     models = load_models()
-
     if models is None:
         st.stop()
 
-    # Get feature names and class labels
-    features = models['classification_features']
     class_labels = models['label_encoder'].classes_
-
-    # Show the possible categories
     st.info(f"**Possible Categories:** {', '.join(class_labels)}")
 
-    # Show binning info if available
     if models['binning_info']:
         with st.expander("How were categories created?"):
             binning = models['binning_info']
-            st.write(f"Original target: **{binning['original_target']}**")
-            st.write("Categories were created by binning the numerical values:")
+            st.write(f"The original **{binning['original_target']}** was split into categories:")
             for i, label in enumerate(binning['labels']):
                 if i == 0:
-                    st.write(f"- **{label}**: < {binning['bins'][i+1]}")
+                    st.write(f"- **{label}**: < ${binning['bins'][i+1]:,.0f}")
                 elif i == len(binning['labels']) - 1:
-                    st.write(f"- **{label}**: >= {binning['bins'][i]}")
+                    st.write(f"- **{label}**: >= ${binning['bins'][i]:,.0f}")
                 else:
-                    st.write(f"- **{label}**: {binning['bins'][i]} to {binning['bins'][i+1]}")
+                    st.write(f"- **{label}**: ${binning['bins'][i]:,.0f} to ${binning['bins'][i+1]:,.0f}")
 
     st.markdown("---")
-    st.markdown("### Enter Feature Values")
+    st.markdown("### Listing Details")
 
-    # Create input fields
-    # TODO: CUSTOMIZE THIS SECTION FOR YOUR FEATURES!
-
-    col1, col2 = st.columns(2)
-
-    input_values = {}
-
-    for i, feature in enumerate(features):
-        with col1 if i % 2 == 0 else col2:
-            # TODO: Customize each input based on your feature type and range
-            input_values[feature] = st.number_input(
-                label=feature,
-                value=0.0,
-                key=f"class_{feature}",  # Unique key for classification inputs
-                help=f"Enter value for {feature}"
-            )
+    input_values = get_user_inputs(key_prefix="class_")
 
     st.markdown("---")
 
-    # Prediction button
-    if st.button("🔮 Make Classification Prediction", type="primary"):
-        # Create input dataframe
+    if st.button("🔮 Predict Category", type="primary"):
         input_df = pd.DataFrame([input_values])
-
-        # Make prediction
         predicted_label, predicted_index = make_classification_prediction(models, input_df)
 
-        # Display result with color coding
-        # TODO: Customize colors based on your categories
         color_map = {
-            'Low': '🔴',
+            'Low': '🟢',
             'Medium': '🟡',
-            'High': '🟢'
+            'High': '🔴'
         }
         emoji = color_map.get(predicted_label, '🔵')
 
         st.success(f"### Predicted Category: {emoji} {predicted_label}")
 
-        # TODO: Add interpretation
-        # st.write(f"This means... [interpretation]")
-
-        # Show input summary
         with st.expander("View Input Summary"):
-            st.dataframe(input_df)
+            display_df = pd.DataFrame([{
+                'Room Type': [k for k, v in {
+                    'Entire home/apt': not input_values['room_type_Private room'] and not input_values['room_type_Shared room'],
+                    'Private room': input_values['room_type_Private room'],
+                    'Shared room': input_values['room_type_Shared room']
+                }.items() if v][0],
+                'Borough': 'Manhattan' if input_values['neighbourhood_group_Manhattan'] else 'Other',
+                'Reviews/Month': input_values['reviews_per_month'],
+                'Availability': f"{input_values['availability_ratio']:.0%}",
+                'Host Listings': input_values['calculated_host_listings_count'],
+                'Min Nights': input_values['minimum_nights'],
+            }])
+            st.dataframe(display_df, hide_index=True)
 
 
 # =============================================================================
@@ -318,9 +331,8 @@ st.markdown("---")
 st.markdown(
     """
     <div style='text-align: center; color: gray;'>
-        Built by [YOUR NAME] | Full Stack Academy AI & ML Bootcamp
+        Built by Brodie Ellis | Full Stack Academy AI & ML Bootcamp
     </div>
     """,
     unsafe_allow_html=True
 )
-# TODO: Replace [YOUR NAME] above with your actual name!
