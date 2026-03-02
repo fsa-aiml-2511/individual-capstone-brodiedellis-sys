@@ -422,26 +422,30 @@ Reach out to Abishek on Slack if you have any questions or get stuck!
 
 > **Important:** This section is the first thing visitors see when they land on your GitHub repo. This is your portfolio—make it professional and complete! Update this before your final submission.
 
-**Student Name:** [Your Name]
+**Student Name:** Brodie Ellis
 
-**Dataset:** [Dataset name and source - include a link if from Kaggle]
+**Dataset:** [NYC Airbnb Open Data 2019](https://www.kaggle.com/datasets/dgomonov/new-york-city-airbnb-open-data) — 48,895 listings across all five NYC boroughs
 
-**Problem Statement:** [What are you trying to predict and why? Write 2-3 sentences explaining the value of this prediction.]
+**Problem Statement:** Can we predict the nightly price of an Airbnb listing based on its characteristics? Accurate price predictions help hosts set competitive rates and help guests understand fair pricing across New York City neighborhoods.
 
-**Target Variable:** [Column name - e.g., "price" or "salary"]
+**Target Variable:** `price` (nightly rental price in USD)
 
-**Selected Features:** [List the 4-8 features your final model uses]
+**Selected Features:**
+- Room type (Entire home/apt, Private room, Shared room)
+- Borough (Manhattan vs. other boroughs)
+- Reviews per month
+- Availability ratio (proportion of year available)
+- Host's total listing count
+- Minimum nights required
 
-**Best Regression Model:** [Model type and key metric - e.g., "Random Forest (R² = 0.82)"]
+**Best Regression Model:** Gradient Boosting Regressor (R² = 0.45, RMSE = $66)
 
-**Best Classification Model:** [Model type and key metric - e.g., "Gradient Boosting (Accuracy = 85%)"]
+**Best Classification Model:** Gradient Boosting Classifier (Accuracy = 65%, F1 = 0.64)
 
 **Deployed App URL:** [Add your Streamlit Cloud URL once deployed]
 
 ### Project Highlights
 
-[Write 2-3 bullet points about interesting findings or challenges you overcame. This helps employers understand your thought process!]
-
--
--
--
+- Room type was by far the most important predictor — entire homes/apartments command significantly higher prices than private or shared rooms
+- Manhattan listings are consistently priced higher than other boroughs, which the model captures through the borough feature
+- The classification model struggles most with the Medium price category, often confusing it with High — this makes sense since the boundary between mid-range and expensive listings is naturally fuzzy
